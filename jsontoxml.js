@@ -69,7 +69,7 @@ var processToXml = function (nodeData, options) {
                             attributes += ' ' + nodeData.attrs;
                         } else {
                             mForOwn(nodeData.attrs, function (val, key) {
-                                attributes += ' ' + key + '="' + options.escape ? esc(val) : val + '"';
+                                attributes += ' ' + key + '="' + (options.escape ? esc(val) : val) + '"';
                             });
                         }
                     }
@@ -121,9 +121,9 @@ var xmlHeader = function (options) {
 module.exports = function (obj, options) {
 
     //noinspection JSUnresolvedVariable
-    var docType = '', header = '', Buffer = this.Buffer || function Buffer() {};
+    var docType = '', header = '', buffer = Buffer || function Buffer(){};
 
-    if (typeof obj === 'string' || obj instanceof Buffer) {
+    if (typeof obj === 'string' || obj instanceof buffer) {
         try {
             obj = JSON.parse(obj.toString());
         } catch (e) {

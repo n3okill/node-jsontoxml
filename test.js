@@ -25,7 +25,7 @@ var input = {
   }
 };
 
-var expected_no_element_substitution = 
+var expected_no_element_substitution =
 '<node>text content</node>'
 +'<parent>'
   +'<taco>'
@@ -48,7 +48,7 @@ var expected_no_element_substitution =
   +'<date2>'+date.toJSON()+'</date2>'
 +'</parent2>';
 
-var expected_with_element_substitution = 
+var expected_with_element_substitution =
 '<node>text content</node>'
 +'<parent>'
   +'<taco>'
