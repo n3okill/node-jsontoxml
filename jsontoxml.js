@@ -1,190 +1,182 @@
-//copyright Ryan Day 2010 <http://ryanday.org>, Joscha Feth 2013 <http://www.feth.com> [MIT Licensed]
+//copyright Ryan Day 2010 <http://ryanday.org>, Joscha Feth 2013 <http://www.feth.com>, João Parreira 2013 [MIT Licensed]
 
-var element_start_char = 
-	"a-zA-Z_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FFF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD";
-var element_non_start_char = "\-.0-9\u00B7\u0300-\u036F\u203F\u2040"; 
-var element_replace = new RegExp("^([^" + element_start_char + "])|^((x|X)(m|M)(l|L))|([^" + element_start_char + element_non_start_char + "])", "g");
 
-var process_to_xml = function(node_data,options){
+"use strict";
 
-  var makeNode = function(name, content, attributes, level, hasSubNodes) {
+//noinspection JSUnresolvedFunction
+var mLang = require('mout/lang'),
+    mMap = require('mout/array/map'),
+    mForOwn = require('mout/object/forOwn'),
+    mStringRepeat = require('mout/string/repeat');
 
-    var indent_value = options.indent !== undefined ? options.indent : "\t";
-    var indent = options.prettyPrint ? '\n' + new Array(level).join(indent_value) : '';
-    if(options.removeIllegalNameCharacters) {
-	name = name.replace(element_replace, '_');
-    }
 
-    var node = [indent, '<',name, (attributes || '')];
-    if(content && content.length > 0) {
-      node.push('>')
-      node.push(content);
-      hasSubNodes && node.push(indent);
-      node.push('</');
-      node.push(name);
-      node.push('>');
-    } else {
-      node.push('/>');
-    }
-    return node.join('');
-  };
+var elementStartChar = "a-zA-Z_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FFF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD",
+    elementNonStartChar = "\\-.0-9\u00B7\u0300-\u036F\u203F\u2040",
+    elementReplace = new RegExp("^([^" + elementStartChar + "])|^((x|X)(m|M)(l|L))|([^" + elementStartChar + elementNonStartChar + "])", "g");
 
-  return (function fn(node_data,node_descriptor, level){
-    var type = typeof node_data;
-    if((Array.isArray) ? Array.isArray(node_data) : node_data instanceof Array) {
-      type = 'array';
-    } else if(node_data instanceof Date) {
-      type = 'date';
-    }
+var processToXml = function (nodeData, options) {
 
-    switch(type) {
-    //if value is an array create child nodes from values
-      case 'array':
-        var ret = [];
-        node_data.map(function(v){
-            ret.push(fn(v,1, level+1));
-            //entries that are values of an array are the only ones that can be special node descriptors
-        });
-        options.prettyPrint && ret.push('\n');
-        return ret.join('');
-        break;
+    var makeNode = function (name, content, attributes, level, hasSubNodes) {
 
-      case 'date':
-        // cast dates to ISO 8601 date (soap likes it)
-        return node_data.toJSON?node_data.toJSON():node_data+'';
-        break;
-
-      case 'object':
-        if(node_descriptor == 1 && node_data.name){
-          var content = []
-          , attributes = []
-          ;
-
-          if(node_data.attrs) {
-            if(typeof node_data.attrs != 'object') {
-            // attrs is a string, etc. - just use it as an attribute
-              attributes.push(' ');
-              attributes.push(node_data.attrs);
-            } else {
-              for(var key in node_data.attrs){
-                var value = node_data.attrs[key];
-                attributes.push(' ');
-                attributes.push(key);
-                attributes.push('="')
-                attributes.push(options.escape ? esc(value) : value);
-                attributes.push('"');
-              }
-            }
-          }
-
-          //later attributes can be added here
-          if(typeof node_data.value != 'undefined') {
-            var c = ''+node_data.value;
-            content.push(options.escape ? esc(c) : c);
-          } else if(typeof node_data.text != 'undefined') {
-            var c = ''+node_data.text;
-            content.push(options.escape ? esc(c) : c);
-          }
-
-          if(node_data.children){
-            content.push(fn(node_data.children,0,level+1));
-          }
-
-          return makeNode(node_data.name, content.join(''), attributes.join(''),level,!!node_data.children);
-
-        } else {
-          var nodes = [];
-          for(var name in node_data){
-            nodes.push(makeNode(name, fn(node_data[name],0,level+1),null,level+1));
-          }
-          options.prettyPrint && nodes.length > 0 && nodes.push('\n');
-          return nodes.join('');
+        var indentValue, indent, node;
+        //noinspection JSUnresolvedVariable
+        indentValue = options.indent || "\t";
+        //noinspection JSUnresolvedVariable
+        indent = options.prettyPrint ? '\n' + mStringRepeat(indentValue, level) : '';
+        //noinspection JSUnresolvedVariable
+        if (options.removeIllegalNameCharacters) {
+            name = name.replace(elementReplace, '_');
         }
-        break;
 
-      case 'function':
-        return node_data();
-        break;
+        node = indent + '<' + name + (attributes || '');
+        if (content && content.length > 0) {
+            node += '>' + content + (hasSubNodes ? indent : '') + '</' + name + '>';
+        } else {
+            node += '/>';
+        }
+        return node;
+    };
 
-      default:
-        return options.escape ? esc(node_data) : ''+node_data;
-    }
+    return (function fn(nodeData, nodeDescriptor, level) {
+        var type = typeof nodeData, ret = '', content = '', attributes = '', nodes = '';
+        if (mLang.isArray(nodeData)) {
+            type = 'array';
+        } else if (nodeData instanceof Date) {
+            type = 'date';
+        }
 
-  }(node_data, 0, 0))
+        switch (type) {
+            //if value is an array create child nodes from values
+            case 'array':
+                ret = '';
+                nodeData = mMap(nodeData, function (val) {
+                    ret += fn(val, 1, level + 1);
+                });
+                //noinspection JSUnresolvedVariable
+                if (options.prettyPrint) {
+                    ret += '\n';
+                }
+                return ret;
+
+            case 'date':
+                // cast dates to ISO 8601 date (soap likes it)
+                return nodeData.toJSON ? nodeData.toJSON() : String(nodeData);
+
+            case 'object':
+                if (nodeDescriptor === 1 && nodeData.name) {
+                    if (nodeData.attrs) {
+                        if (typeof nodeData.attrs !== 'object') {
+                            attributes += ' ' + nodeData.attrs;
+                        } else {
+                            mForOwn(nodeData.attrs, function (val, key) {
+                                attributes += ' ' + key + '="' + options.escape ? esc(val) : val + '"';
+                            });
+                        }
+                    }
+
+                    //later attributes can be added here
+                    if (typeof nodeData.value !== 'undefined') {
+                        content += options.escape ? esc(String(nodeData.value)) : String(nodeData.value);
+                    } else if (typeof nodeData.text !== 'undefined') {
+                        content += options.escape ? esc(String(nodeData.text)) : String(nodeData.text);
+                    }
+
+                    if (nodeData.children) {
+                        content += fn(nodeData.children, 0, level + 1);
+                    }
+                    return makeNode(nodeData.name, content, attributes, level, !!nodeData.children);
+
+                }
+                mForOwn(nodeData, function (val, key) {
+                    nodes += makeNode(key, fn(val, 0, level + 1), null, level + 1);
+                });
+                //noinspection JSUnresolvedVariable
+                if (options.prettyPrint && nodes.length > 0) {
+                    nodes += '\n';
+                }
+                return nodes;
+            case 'function':
+                return nodeData();
+            default:
+                return options.escape ? esc(nodeData) : String(nodeData);
+        }
+
+    }(nodeData, 0, 0));
 };
 
 
-var xml_header = function(standalone) {
-  var ret = ['<?xml version="1.0" encoding="utf-8"'];
-
-  if(standalone) {
-    ret.push(' standalone="yes"');
-  }
-
-  ret.push('?>');
-
-  return ret.join('');
+var xmlHeader = function (options) {
+    options = options || {};
+    //noinspection JSUnresolvedVariable
+    var ret = '<?xml version="' + options.version || '1.0' + '" encoding="' + options.encoding || 'utf-8' + '" ';
+    //noinspection JSUnresolvedVariable
+    if (options.standalone) {
+        ret += 'standalone="yes"';
+    }
+    ret += '?>';
+    return ret;
 };
 
-module.exports = function(obj,options){
+//noinspection JSUnresolvedVariable
+module.exports = function (obj, options) {
 
-  var Buffer = this.Buffer || function Buffer () {};
+    //noinspection JSUnresolvedVariable
+    var docType = '', header = '', Buffer = this.Buffer || function Buffer() {};
 
-  if(typeof obj == 'string' || obj instanceof Buffer) {
-    try{
-      obj = JSON.parse(obj.toString());
-    } catch(e){
-      return false;
+    if (typeof obj === 'string' || obj instanceof Buffer) {
+        try {
+            obj = JSON.parse(obj.toString());
+        } catch (e) {
+            return false;
+        }
     }
-  }
 
-  var xmlheader = '';
-  var docType = '';
-  if(options) {
-    if(typeof options == 'object') {
-      // our config is an object
+    if (options) {
+        if (typeof options === 'object') {
+            // our config is an object
 
-      if(options.xmlHeader) {
-        // the user wants an xml header
-        xmlheader = xml_header(!!options.xmlHeader.standalone);
-      }
+            //noinspection JSUnresolvedVariable
+            if (options.xmlHeader) {
+                // the user wants an xml header
+                //noinspection JSUnresolvedVariable
+                header = xmlHeader(options.xmlHeader);
+            }
 
-      if(typeof options.docType != 'undefined') {
-        docType = '<!DOCTYPE '+options.docType+'>'
-      }
-    } else {
-      // our config is a boolean value, so just add xml header
-      xmlheader = xml_header();
+            //noinspection JSUnresolvedVariable
+            if (options.docType !== undefined) {
+                //noinspection JSUnresolvedVariable
+                docType = '<!DOCTYPE ' + options.docType + '>';
+            }
+        } else {
+            header = xmlHeader();
+        }
     }
-  }
-  options = options || {}
+    options = options || {};
 
-  var ret = [
-    xmlheader,
-    (options.prettyPrint && docType ? '\n' : ''),
-  docType,
-    process_to_xml(obj,options)
-  ];
+    //noinspection JSUnresolvedVariable
+    return header + (options.prettyPrint && docType ? '\n' : '') + docType + processToXml(obj, options);
+};
 
-  return ret.join('');
-}
+//noinspection JSUnresolvedVariable
+module.exports.jsonToXml = module.exports.objToXml = module.exports;
 
-module.exports.json_to_xml=
-module.exports.obj_to_xml = module.exports;
-
+//noinspection JSUnresolvedVariable
 module.exports.escape = esc;
 
-function esc(str){
-  return (''+str).replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/'/g, '&apos;')
-      .replace(/"/g, '&quot;');
+function esc(str) {
+    return String(str).replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&apos;')
+        .replace(/"/g, '&quot;');
 }
 
+//noinspection JSUnresolvedVariable
 module.exports.cdata = cdata;
 
-function cdata(str){
-  if(str) return "<![CDATA["+str.replace(/]]>/g,'')+']]>';
-  return "<![CDATA[]]>";
-};
+function cdata(str) {
+    if (str) {
+        return "<![CDATA[" + str.replace(/\]\]>/g, '') + ']]>';
+    }
+    return "<![CDATA[]]>";
+}
